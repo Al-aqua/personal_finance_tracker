@@ -1,10 +1,83 @@
 import 'package:flutter/material.dart';
+import 'package:personal_finance_tracker/models/transaction.dart';
 import 'package:personal_finance_tracker/widgets/balance_overview_card.dart';
-import 'package:personal_finance_tracker/widgets/savings_goal_card.dart';
+import 'package:personal_finance_tracker/widgets/grouped_transaction_list.dart';
 import 'package:personal_finance_tracker/widgets/summary_card.dart';
 
-class FinanceDashboard extends StatelessWidget {
+class FinanceDashboard extends StatefulWidget {
   const FinanceDashboard({super.key});
+
+  @override
+  State<FinanceDashboard> createState() => _FinanceDashboardState();
+}
+
+class _FinanceDashboardState extends State<FinanceDashboard> {
+  String? _selectedCategory;
+
+  // Add this method to the class
+  List<Transaction> get _filteredTransactions {
+    var filtered = _transactions;
+
+    if (_selectedCategory != null) {
+      filtered = filtered
+          .where((tx) => tx.category == _selectedCategory)
+          .toList();
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered
+          .where(
+            (tx) => tx.title.toLowerCase().contains(_searchQuery.toLowerCase()),
+          )
+          .toList();
+    }
+
+    return filtered;
+  }
+
+  String _searchQuery = '';
+
+  // Sample transaction data
+  final List<Transaction> _transactions = [
+    Transaction(
+      id: 't1',
+      title: 'Grocery Shopping',
+      amount: 45.99,
+      date: DateTime.now().subtract(const Duration(days: 1)),
+      category: 'Food',
+      isExpense: true,
+    ),
+    Transaction(
+      id: 't2',
+      title: 'Monthly Salary',
+      amount: 1500.00,
+      date: DateTime.now().subtract(const Duration(days: 3)),
+      category: 'Salary',
+      isExpense: false,
+    ),
+    Transaction(
+      id: 't3',
+      title: 'New Headphones',
+      amount: 99.99,
+      date: DateTime.now().subtract(const Duration(days: 5)),
+      category: 'Shopping',
+      isExpense: true,
+    ),
+    Transaction(
+      id: 't4',
+      title: 'Restaurant Dinner',
+      amount: 35.50,
+      date: DateTime.now().subtract(const Duration(days: 7)),
+      category: 'Food',
+      isExpense: true,
+    ),
+  ];
+
+  void _deleteTransaction(String id) {
+    setState(() {
+      _transactions.removeWhere((tx) => tx.id == id);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +94,7 @@ class FinanceDashboard extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Balance Card
-          BalanceOverviewCard(),
+          const BalanceOverviewCard(),
           const SizedBox(height: 24),
 
           // Income & Expenses Row
@@ -30,11 +103,9 @@ class FinanceDashboard extends StatelessWidget {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          const SavingsGoalCard(),
-          const SizedBox(height: 24),
 
           // Income and Expense cards
-          Row(
+          const Row(
             children: [
               Expanded(
                 child: SummaryCard(
@@ -44,7 +115,7 @@ class FinanceDashboard extends StatelessWidget {
                   color: Colors.green,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16),
               Expanded(
                 child: SummaryCard(
                   title: 'Expenses',
@@ -56,22 +127,66 @@ class FinanceDashboard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-
-          // Recent Transactions Header
-          const Text(
-            'Recent Transactions',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-
-          // Placeholder for transactions (will implement in Lab 3)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(32.0),
-              child: Text(
-                'Your transactions will appear here',
-                style: TextStyle(color: Colors.grey),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search transactions...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 0,
+                  horizontal: 16,
+                ),
               ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
+          ),
+          // Recent Transactions Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Recent Transactions',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              DropdownButton<String?>(
+                hint: const Text('All Categories'),
+                value: _selectedCategory,
+                onChanged: (newValue) {
+                  setState(() {
+                    _selectedCategory = newValue;
+                  });
+                },
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('All Categories'),
+                  ),
+                  ...{..._transactions.map((tx) => tx.category)}.map(
+                    (category) => DropdownMenuItem<String>(
+                      value: category,
+                      child: Text(category),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Transaction List
+          SizedBox(
+            height: 400, // Fixed height for the list
+            child: GroupedTransactionList(
+              transactions: _filteredTransactions,
+              onDeleteTransaction: _deleteTransaction,
             ),
           ),
         ],
