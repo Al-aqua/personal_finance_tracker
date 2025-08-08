@@ -1,6 +1,7 @@
 # personal_finance_tracker
 
-A new Flutter project.
+This is the app from my mobile application development with flutter course at
+https://mobile-application-development.al-aqua.dev.
 
 ## Getting Started
 
