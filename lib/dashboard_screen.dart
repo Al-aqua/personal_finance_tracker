@@ -42,13 +42,6 @@ class DashboardScreen extends StatelessWidget {
           debugPrint('Tapped item $index');
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          debugPrint('Add transaction button pressed');
-        },
-        tooltip: 'Add Transaction',
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }
