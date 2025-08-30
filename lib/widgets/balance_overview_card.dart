@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class BalanceOverviewCard extends StatelessWidget {
-  const BalanceOverviewCard({super.key});
+  const BalanceOverviewCard({super.key, required this.balance});
+  final double balance;
 
   @override
   Widget build(BuildContext context) {
@@ -52,61 +53,9 @@ class BalanceOverviewCard extends StatelessWidget {
               style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildBalanceDetail(
-                  context,
-                  Icons.calendar_today,
-                  'This Month',
-                  '\$1,250.00',
-                ),
-                _buildBalanceDetail(
-                  context,
-                  Icons.account_balance_wallet,
-                  'This Year',
-                  '\$12,500.00',
-                ),
-              ],
-            ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBalanceDetail(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String amount,
-  ) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: Theme.of(context).colorScheme.primary,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            Text(amount, style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ],
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:personal_finance_tracker/models/transaction.dart';
 import 'package:personal_finance_tracker/widgets/balance_overview_card.dart';
 import 'package:personal_finance_tracker/widgets/grouped_transaction_list.dart';
 import 'package:personal_finance_tracker/widgets/summary_card.dart';
+import 'package:personal_finance_tracker/widgets/add_transaction_form.dart';
 
 class FinanceDashboard extends StatefulWidget {
   const FinanceDashboard({super.key});
@@ -73,6 +74,12 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
     ),
   ];
 
+  void _deleteTransaction(String id) {
+    setState(() {
+      _transactions.removeWhere((tx) => tx.id == id);
+    });
+  }
+
   void _addTransaction(
     String title,
     double amount,
@@ -93,74 +100,34 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
     });
   }
 
-  void _deleteTransaction(String id) {
-    setState(() {
-      _transactions.removeWhere((tx) => tx.id == id);
-    });
-  }
-
   void _startAddTransaction(BuildContext context) {
-    String title = '';
-    String category = '';
-    String amountStr = '';
-    bool isExpense = true;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (_) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                decoration: const InputDecoration(labelText: 'Title'),
-                onChanged: (value) => title = value,
-              ),
-              TextField(
-                decoration: const InputDecoration(labelText: 'Amount'),
-                keyboardType: TextInputType.number,
-                onChanged: (value) => amountStr = value,
-              ),
-              TextField(
-                decoration: const InputDecoration(labelText: 'Category'),
-                onChanged: (value) => category = value,
-              ),
-              SwitchListTile(
-                title: const Text('Is Expense?'),
-                value: isExpense,
-                onChanged: (value) {
-                  setState(() {
-                    isExpense = value;
-                  });
-                },
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (title.isEmpty || amountStr.isEmpty || category.isEmpty) {
-                    return;
-                  }
-                  _addTransaction(
-                    title,
-                    double.parse(amountStr),
-                    category,
-                    isExpense,
-                  );
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Add Transaction'),
-              ),
-            ],
-          ),
-        );
+        return AddTransactionForm(onAddTransaction: _addTransaction);
       },
     );
+  }
+
+  // Calculate totals for summary cards
+  double get _totalIncome {
+    return _transactions
+        .where((tx) => !tx.isExpense)
+        .fold(0.0, (sum, tx) => sum + tx.amount);
+  }
+
+  double get _totalExpenses {
+    return _transactions
+        .where((tx) => tx.isExpense)
+        .fold(0.0, (sum, tx) => sum + tx.amount);
+  }
+
+  double get _balance {
+    return _totalIncome - _totalExpenses;
   }
 
   @override
@@ -179,7 +146,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
             const SizedBox(height: 16),
 
             // Balance Card
-            const BalanceOverviewCard(),
+            BalanceOverviewCard(balance: _balance),
             const SizedBox(height: 24),
 
             // Income & Expenses Row
@@ -190,12 +157,12 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
             const SizedBox(height: 16),
 
             // Income and Expense cards
-            const Row(
+            Row(
               children: [
                 Expanded(
                   child: SummaryCard(
                     title: 'Income',
-                    amount: 1250.00,
+                    amount: _totalIncome,
                     icon: Icons.arrow_upward,
                     color: Colors.green,
                   ),
@@ -204,7 +171,7 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
                 Expanded(
                   child: SummaryCard(
                     title: 'Expenses',
-                    amount: 850.00,
+                    amount: _totalExpenses,
                     icon: Icons.arrow_downward,
                     color: Colors.red,
                   ),
@@ -278,10 +245,8 @@ class _FinanceDashboardState extends State<FinanceDashboard> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _startAddTransaction(context);
-        },
-        child: Icon(Icons.add),
+        onPressed: () => _startAddTransaction(context),
+        child: const Icon(Icons.add),
       ),
     );
   }
