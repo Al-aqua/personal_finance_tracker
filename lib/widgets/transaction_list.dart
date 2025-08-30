@@ -5,11 +5,13 @@ import '../models/transaction.dart';
 class TransactionList extends StatelessWidget {
   final List<Transaction> transactions;
   final Function(String) onDeleteTransaction;
+  final Function(Transaction)? onTransactionTap;
 
   const TransactionList({
     super.key,
     required this.transactions,
     required this.onDeleteTransaction,
+    this.onTransactionTap,
   });
 
   @override
@@ -36,6 +38,7 @@ class TransactionList extends StatelessWidget {
         return TransactionCard(
           transaction: transactions[index],
           onDelete: onDeleteTransaction,
+          onTap: onTransactionTap,
         );
       },
     );
@@ -45,11 +48,13 @@ class TransactionList extends StatelessWidget {
 class TransactionCard extends StatelessWidget {
   final Transaction transaction;
   final Function(String) onDelete;
+  final Function(Transaction)? onTap;
 
   const TransactionCard({
     super.key,
     required this.transaction,
     required this.onDelete,
+    this.onTap,
   });
 
   @override
@@ -58,6 +63,7 @@ class TransactionCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
       elevation: 2,
       child: ListTile(
+        onTap: onTap != null ? () => onTap!(transaction) : null,
         leading: CircleAvatar(
           radius: 24,
           backgroundColor: transaction.isExpense
