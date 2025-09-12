@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:personal_finance_tracker/screens/currency_converter_screen.dart';
 import 'package:personal_finance_tracker/screens/settings_screen.dart';
 import 'package:personal_finance_tracker/screens/statistics_screen.dart';
 import 'dashboard_screen.dart';
@@ -134,12 +135,14 @@ class _MainScreenState extends State<MainScreen> {
         onRefresh: _loadTransactions,
       ),
       StatisticsScreen(transactions: _transactions),
+      const CurrencyConverterScreen(),
       const SettingsScreen(),
     ];
 
     return Scaffold(
       body: screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed, // Show all tabs
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() {
@@ -151,6 +154,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart),
             label: 'Statistics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.currency_exchange),
+            label: 'Convert',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
