@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:personal_finance_tracker/models/transaction.dart';
-import 'package:personal_finance_tracker/screens/transaction_detail_screen.dart';
-import 'package:personal_finance_tracker/widgets/add_transaction_form.dart';
-import 'package:personal_finance_tracker/widgets/transaction_list.dart';
+import 'models/transaction.dart';
+import 'screens/transaction_detail_screen.dart';
+import 'widgets/add_transaction_form.dart';
+import 'widgets/transaction_list.dart';
 
 class DashboardScreen extends StatefulWidget {
   final List<Transaction> transactions;
   final Function(String, double, String, bool) onAddTransaction;
   final Function(String) onDeleteTransaction;
+  final VoidCallback onRefresh;
 
   const DashboardScreen({
     super.key,
     required this.transactions,
     required this.onAddTransaction,
     required this.onDeleteTransaction,
+    required this.onRefresh,
   });
 
   @override
@@ -95,100 +97,113 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
         leading: const Icon(Icons.account_balance_wallet),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: widget.onRefresh,
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Balance Card
-            BalanceOverviewCard(balance: _balance),
-            const SizedBox(height: 24),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          widget.onRefresh();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Balance Card
+              BalanceOverviewCard(balance: _balance),
+              const SizedBox(height: 24),
 
-            // Summary Cards
-            Row(
-              children: [
-                Expanded(
-                  child: SummaryCard(
-                    title: 'Income',
-                    amount: _totalIncome,
-                    icon: Icons.arrow_upward,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: SummaryCard(
-                    title: 'Expenses',
-                    amount: _totalExpenses,
-                    icon: Icons.arrow_downward,
-                    color: Colors.red,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Search Bar
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Search transactions...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Filter and Title
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Recent Transactions',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                DropdownButton<String?>(
-                  hint: const Text('All'),
-                  value: _selectedCategory,
-                  onChanged: (newValue) {
-                    setState(() {
-                      _selectedCategory = newValue;
-                    });
-                  },
-                  items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('All Categories'),
+              // Summary Cards
+              Row(
+                children: [
+                  Expanded(
+                    child: SummaryCard(
+                      title: 'Income',
+                      amount: _totalIncome,
+                      icon: Icons.arrow_upward,
+                      color: Colors.green,
                     ),
-                    ...{...widget.transactions.map((tx) => tx.category)}.map(
-                      (category) => DropdownMenuItem<String>(
-                        value: category,
-                        child: Text(category),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: SummaryCard(
+                      title: 'Expenses',
+                      amount: _totalExpenses,
+                      icon: Icons.arrow_downward,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Search Bar
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search transactions...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Filter and Title
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Recent Transactions',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  DropdownButton<String?>(
+                    hint: const Text('All'),
+                    value: _selectedCategory,
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedCategory = newValue;
+                      });
+                    },
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All Categories'),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Transaction List
-            SizedBox(
-              height: 400,
-              child: TransactionList(
-                transactions: _filteredTransactions,
-                onDeleteTransaction: widget.onDeleteTransaction,
-                onTransactionTap: _navigateToTransactionDetail,
+                      ...{...widget.transactions.map((tx) => tx.category)}.map(
+                        (category) => DropdownMenuItem<String>(
+                          value: category,
+                          child: Text(category),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+
+              // Transaction List
+              SizedBox(
+                height: 400,
+                child: TransactionList(
+                  transactions: _filteredTransactions,
+                  onDeleteTransaction: widget.onDeleteTransaction,
+                  onTransactionTap: _navigateToTransactionDetail,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -199,6 +214,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
+// Keep the same BalanceOverviewCard and SummaryCard classes from Lab 6
 class BalanceOverviewCard extends StatelessWidget {
   final double balance;
 

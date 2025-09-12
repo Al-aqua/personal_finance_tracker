@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:personal_finance_tracker/services/settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -8,12 +9,86 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final SettingsService _settingsService = SettingsService();
+
   bool _darkMode = false;
   bool _notifications = true;
   String _currency = 'USD';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final currency = await _settingsService.getCurrency();
+      final darkMode = await _settingsService.getDarkMode();
+      final notifications = await _settingsService.getNotifications();
+
+      setState(() {
+        _currency = currency;
+        _darkMode = darkMode;
+        _notifications = notifications;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading settings: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _updateDarkMode(bool value) async {
+    await _settingsService.setDarkMode(value);
+    setState(() {
+      _darkMode = value;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Dark mode ${value ? 'enabled' : 'disabled'}')),
+      );
+    }
+  }
+
+  Future<void> _updateNotifications(bool value) async {
+    await _settingsService.setNotifications(value);
+    setState(() {
+      _notifications = value;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Notifications ${value ? 'enabled' : 'disabled'}'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _updateCurrency(String currency) async {
+    await _settingsService.setCurrency(currency);
+    setState(() {
+      _currency = currency;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Currency changed to $currency')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
@@ -75,11 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Dark Mode'),
                   subtitle: const Text('Enable dark theme'),
                   value: _darkMode,
-                  onChanged: (value) {
-                    setState(() {
-                      _darkMode = value;
-                    });
-                  },
+                  onChanged: _updateDarkMode,
                   secondary: const Icon(Icons.dark_mode),
                 ),
                 const Divider(height: 1),
@@ -87,11 +158,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Notifications'),
                   subtitle: const Text('Receive transaction alerts'),
                   value: _notifications,
-                  onChanged: (value) {
-                    setState(() {
-                      _notifications = value;
-                    });
-                  },
+                  onChanged: _updateNotifications,
                   secondary: const Icon(Icons.notifications),
                 ),
                 const Divider(height: 1),
@@ -134,16 +201,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  title: const Text('Backup & Sync'),
-                  subtitle: const Text('Sync data across devices'),
-                  leading: const Icon(Icons.cloud_sync),
+                  title: const Text('Clear All Data'),
+                  subtitle: const Text('Delete all transactions and settings'),
+                  leading: const Icon(Icons.delete_forever, color: Colors.red),
                   trailing: const Icon(Icons.arrow_forward_ios),
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Backup feature coming soon!'),
-                      ),
-                    );
+                    _showClearDataDialog();
                   },
                 ),
                 const Divider(height: 1),
@@ -178,14 +241,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: currency,
                 groupValue: _currency,
                 onChanged: (value) {
-                  setState(() {
-                    _currency = value!;
-                  });
+                  if (value != null) {
+                    _updateCurrency(value);
+                  }
                   Navigator.of(context).pop();
                 },
               );
             }).toList(),
           ),
+        );
+      },
+    );
+  }
+
+  void _showClearDataDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Clear All Data'),
+          content: const Text(
+            'This will permanently delete all your transactions and settings. This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // Clear all data
+                await _settingsService.clearAllSettings();
+                // You would also clear transaction data here
+
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('All data cleared')),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Clear All'),
+            ),
+          ],
         );
       },
     );

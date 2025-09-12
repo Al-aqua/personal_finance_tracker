@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:personal_finance_tracker/dashboard_screen.dart';
+import 'package:personal_finance_tracker/screens/settings_screen.dart';
+import 'package:personal_finance_tracker/screens/statistics_screen.dart';
+import 'dashboard_screen.dart';
 import 'models/transaction.dart';
-import 'screens/statistics_screen.dart';
-import 'screens/settings_screen.dart';
+import 'services/transaction_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -33,43 +34,45 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  final TransactionService _transactionService = TransactionService();
+  List<Transaction> _transactions = [];
+  bool _isLoading = true;
 
-  // Sample transaction data
-  final List<Transaction> _transactions = [
-    Transaction(
-      id: 't1',
-      title: 'Grocery Shopping',
-      amount: 45.99,
-      date: DateTime.now().subtract(const Duration(days: 1)),
-      category: 'Food',
-      isExpense: true,
-    ),
-    Transaction(
-      id: 't2',
-      title: 'Monthly Salary',
-      amount: 1500.00,
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      category: 'Salary',
-      isExpense: false,
-    ),
-    Transaction(
-      id: 't3',
-      title: 'New Headphones',
-      amount: 99.99,
-      date: DateTime.now().subtract(const Duration(days: 5)),
-      category: 'Shopping',
-      isExpense: true,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+  }
 
-  void _addTransaction(
+  // Load transactions from database
+  Future<void> _loadTransactions() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final transactions = await _transactionService.getAllTransactions();
+      setState(() {
+        _transactions = transactions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading transactions: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Add a new transaction
+  Future<void> _addTransaction(
     String title,
     double amount,
     String category,
     bool isExpense,
-  ) {
-    final newTx = Transaction(
-      id: DateTime.now().toString(),
+  ) async {
+    final newTransaction = Transaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
       amount: amount,
       date: DateTime.now(),
@@ -77,24 +80,58 @@ class _MainScreenState extends State<MainScreen> {
       isExpense: isExpense,
     );
 
-    setState(() {
-      _transactions.add(newTx);
-    });
+    try {
+      await _transactionService.addTransaction(newTransaction);
+      await _loadTransactions(); // Reload to show the new transaction
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Transaction added successfully!')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error adding transaction: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to add transaction')),
+        );
+      }
+    }
   }
 
-  void _deleteTransaction(String id) {
-    setState(() {
-      _transactions.removeWhere((tx) => tx.id == id);
-    });
+  // Delete a transaction
+  Future<void> _deleteTransaction(String id) async {
+    try {
+      await _transactionService.deleteTransaction(id);
+      await _loadTransactions(); // Reload to update the list
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Transaction deleted successfully!')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error deleting transaction: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete transaction')),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final List<Widget> screens = [
       DashboardScreen(
         transactions: _transactions,
         onAddTransaction: _addTransaction,
         onDeleteTransaction: _deleteTransaction,
+        onRefresh: _loadTransactions,
       ),
       StatisticsScreen(transactions: _transactions),
       const SettingsScreen(),
