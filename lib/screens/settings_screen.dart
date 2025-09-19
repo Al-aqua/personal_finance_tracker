@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:personal_finance_tracker/services/settings_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/auth_service.dart';
+import '../services/settings_service.dart';
+import '../services/transaction_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -9,12 +12,17 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final AuthService _authService = AuthService();
   final SettingsService _settingsService = SettingsService();
+  final TransactionService _transactionService = TransactionService();
 
   bool _darkMode = false;
   bool _notifications = true;
   String _currency = 'USD';
   bool _isLoading = true;
+  bool _isSyncing = false;
+
+  User? get _currentUser => FirebaseAuth.instance.currentUser;
 
   @override
   void initState() {
@@ -83,6 +91,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _syncData() async {
+    setState(() {
+      _isSyncing = true;
+    });
+
+    try {
+      await _transactionService.syncToCloud();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Data synced successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sync failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _signOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Sign Out'),
+          content: const Text('Are you sure you want to sign out?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Sign Out'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      try {
+        await _authService.signOut();
+        // AuthWrapper will automatically navigate to login screen
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sign out failed: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -107,28 +191,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: const Icon(
-                      Icons.person,
-                      size: 30,
-                      color: Colors.white,
+                    child: Text(
+                      _currentUser?.displayName
+                              ?.substring(0, 1)
+                              .toUpperCase() ??
+                          'U',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'John Doe',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _currentUser?.displayName ?? 'User',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'john.doe@example.com',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
+                        Text(
+                          _currentUser?.email ?? '',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Synced',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -167,8 +278,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: Text('Current: $_currency'),
                   leading: const Icon(Icons.attach_money),
                   trailing: const Icon(Icons.arrow_forward_ios),
+                  onTap: _showCurrencyDialog,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Cloud Sync Section
+          const Text(
+            'Cloud & Sync',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('Sync Data'),
+                  subtitle: const Text('Upload local data to cloud'),
+                  leading: _isSyncing
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cloud_sync),
+                  trailing: const Icon(Icons.arrow_forward_ios),
+                  onTap: _isSyncing ? null : _syncData,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text('Account Info'),
+                  subtitle: const Text('Manage your account settings'),
+                  leading: const Icon(Icons.account_circle),
+                  trailing: const Icon(Icons.arrow_forward_ios),
                   onTap: () {
-                    _showCurrencyDialog();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Account management coming soon!'),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -201,23 +352,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  title: const Text('Clear All Data'),
-                  subtitle: const Text('Delete all transactions and settings'),
-                  leading: const Icon(Icons.delete_forever, color: Colors.red),
-                  trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () {
-                    _showClearDataDialog();
-                  },
-                ),
-                const Divider(height: 1),
-                ListTile(
                   title: const Text('About'),
                   subtitle: const Text('App version and info'),
                   leading: const Icon(Icons.info),
                   trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () {
-                    _showAboutDialog();
-                  },
+                  onTap: _showAboutDialog,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: const Text(
+                    'Sign Out',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  subtitle: const Text('Sign out of your account'),
+                  leading: const Icon(Icons.logout, color: Colors.red),
+                  trailing: const Icon(Icons.arrow_forward_ios),
+                  onTap: _signOut,
                 ),
               ],
             ),
@@ -254,56 +404,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showClearDataDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Clear All Data'),
-          content: const Text(
-            'This will permanently delete all your transactions and settings. This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                // Clear all data
-                await _settingsService.clearAllSettings();
-                // You would also clear transaction data here
-
-                if (context.mounted) {
-                  Navigator.of(context).pop();
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('All data cleared')),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Clear All'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showAboutDialog() {
     showAboutDialog(
       context: context,
       applicationName: 'Personal Finance Tracker',
-      applicationVersion: '1.0.0',
+      applicationVersion: '2.0.0',
       applicationIcon: const Icon(Icons.account_balance_wallet),
       children: [
         const Text('A simple app to track your personal finances.'),
         const SizedBox(height: 16),
-        const Text('Built with Flutter for educational purposes.'),
+        const Text('Now with cloud sync powered by Firebase!'),
       ],
     );
   }

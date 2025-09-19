@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:personal_finance_tracker/screens/currency_converter_screen.dart';
-import 'package:personal_finance_tracker/screens/settings_screen.dart';
-import 'package:personal_finance_tracker/screens/statistics_screen.dart';
-import 'dashboard_screen.dart';
-import 'models/transaction.dart';
-import 'services/transaction_service.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:personal_finance_tracker/firebase_options.dart';
+import 'screens/login_screen.dart';
+import 'screens/main_screen.dart';
 
-void main() {
+void main() async {
+  // Ensure Flutter is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   runApp(const MyApp());
 }
 
@@ -21,150 +26,34 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MainScreen(),
+      home: const AuthWrapper(),
     );
   }
 }
 
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
-
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
-  final TransactionService _transactionService = TransactionService();
-  List<Transaction> _transactions = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTransactions();
-  }
-
-  // Load transactions from database
-  Future<void> _loadTransactions() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final transactions = await _transactionService.getAllTransactions();
-      setState(() {
-        _transactions = transactions;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading transactions: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  // Add a new transaction
-  Future<void> _addTransaction(
-    String title,
-    double amount,
-    String category,
-    bool isExpense,
-  ) async {
-    final newTransaction = Transaction(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
-      amount: amount,
-      date: DateTime.now(),
-      category: category,
-      isExpense: isExpense,
-    );
-
-    try {
-      await _transactionService.addTransaction(newTransaction);
-      await _loadTransactions(); // Reload to show the new transaction
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaction added successfully!')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error adding transaction: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to add transaction')),
-        );
-      }
-    }
-  }
-
-  // Delete a transaction
-  Future<void> _deleteTransaction(String id) async {
-    try {
-      await _transactionService.deleteTransaction(id);
-      await _loadTransactions(); // Reload to update the list
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Transaction deleted successfully!')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error deleting transaction: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete transaction')),
-        );
-      }
-    }
-  }
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Show loading screen while checking authentication
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    final List<Widget> screens = [
-      DashboardScreen(
-        transactions: _transactions,
-        onAddTransaction: _addTransaction,
-        onDeleteTransaction: _deleteTransaction,
-        onRefresh: _loadTransactions,
-      ),
-      StatisticsScreen(transactions: _transactions),
-      const CurrencyConverterScreen(),
-      const SettingsScreen(),
-    ];
+        // If user is signed in, show main app
+        if (snapshot.hasData && snapshot.data != null) {
+          return const MainScreen();
+        }
 
-    return Scaffold(
-      body: screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed, // Show all tabs
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            label: 'Statistics',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.currency_exchange),
-            label: 'Convert',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-      ),
+        // If user is not signed in, show login screen
+        return const LoginScreen();
+      },
     );
   }
 }
